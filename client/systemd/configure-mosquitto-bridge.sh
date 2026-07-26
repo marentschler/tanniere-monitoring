@@ -19,7 +19,7 @@ set +a
 : "${BRIDGE_REMOTE_USERNAME:=}"
 : "${BRIDGE_REMOTE_PASSWORD:=}"
 : "${BRIDGE_TOPIC:=victron/vedirect/#}"
-: "${BRIDGE_TOPIC_BLUETOOTH:=victron/bluetooth}"
+: "${BRIDGE_TOPIC_SMARTSHUNT:=victron/smartshunt/#}"
 
 if [[ -z "$BRIDGE_REMOTE_HOST" ]]; then
   echo "BRIDGE_REMOTE_HOST is empty in .env"
@@ -46,9 +46,9 @@ topic ${BRIDGE_TOPIC} out 1
 
 EOF
 
-if [[ -n "$BRIDGE_TOPIC_BLUETOOTH" ]]; then
+if [[ -n "$BRIDGE_TOPIC_SMARTSHUNT" ]]; then
   cat >> "$CONF_FILE" <<EOF
-topic ${BRIDGE_TOPIC_BLUETOOTH} out 1
+topic ${BRIDGE_TOPIC_SMARTSHUNT} out 1
 EOF
 fi
 

@@ -1,0 +1,21 @@
+[Unit]
+Description=Victron SmartShunt Bluetooth to MQTT bridge
+After=network-online.target bluetooth.target
+Wants=network-online.target bluetooth.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/tanniere-monitoring-1/client
+EnvironmentFile=/root/tanniere-monitoring-1/client/.env
+ExecStartPre=/usr/local/bin/pair-smartshunt.sh
+ExecStart=/root/tanniere-monitoring-1/client/.venv/bin/python /root/tanniere-monitoring-1/client/src/smartshunt_mqtt_bridge.py
+Restart=always
+RestartSec=15
+User=root
+
+# Pairing scans and retries before the bridge starts, so allow for that.
+TimeoutStartSec=420
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

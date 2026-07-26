@@ -1,5 +1,5 @@
 [Unit]
-Description=Periodic watchdog for VE.Direct and TheengsGateway app services
+Description=Periodic watchdog for VE.Direct and SmartShunt app services
 
 [Timer]
 OnBootSec=45s
