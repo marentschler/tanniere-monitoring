@@ -1,5 +1,5 @@
 [Unit]
-Description=Periodic watchdog for VE.Direct MQTT app service
+Description=Periodic watchdog for VE.Direct and TheengsGateway app services
 
 [Timer]
 OnBootSec=45s

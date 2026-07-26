@@ -1,8 +1,8 @@
 # Client
 
-VE.Direct client for Raspberry Pi.
+VE.Direct + Bluetooth client for Raspberry Pi.
 
-This component reads telemetry from a Victron VE.Direct cable and publishes JSON payloads to MQTT.
+This component reads telemetry from a Victron VE.Direct cable and from TheengsGateway Bluetooth scans, then publishes JSON payloads to MQTT.
 
 ## What this client does
 
@@ -10,7 +10,8 @@ Data flow:
 
 1. Read VE.Direct serial frames from Victron device
 2. Normalize selected fields into JSON
-3. Publish to MQTT topic `victron/vedirect/<device_id>`
+3. Publish VE.Direct telemetry to MQTT topic `victron/vedirect/<device_id>`
+4. Publish Bluetooth telemetry to MQTT topic `victron/bluetooth`
 
 ## Directory layout
 
@@ -19,6 +20,8 @@ Data flow:
 - `.env`: Active runtime configuration
 - `requirements.txt`: Python dependencies
 - `systemd/vedirect-mqtt.service`: Main app service unit
+- `systemd/theengs-gateway.service`: TheengsGateway Bluetooth publisher service
+- `systemd/theengs-gateway.sh`: Wrapper that maps `.env` into TheengsGateway CLI flags
 - `systemd/vedirect-app-watchdog.sh`: App watchdog check script
 - `systemd/vedirect-app-watchdog.service`: App watchdog one-shot service
 - `systemd/vedirect-app-watchdog.timer`: Periodic watchdog timer
@@ -54,6 +57,13 @@ Edit `.env` values:
 - `MQTT_PASSWORD`: MQTT password (optional)
 - `MQTT_TLS`: `true` or `false`
 - `MQTT_KEEPALIVE`: Keepalive seconds
+- `THEENGS_MQTT_HOST`: TheengsGateway MQTT host (usually `127.0.0.1`)
+- `THEENGS_MQTT_PORT`: TheengsGateway MQTT port (usually `1883`)
+- `THEENGS_TOPIC`: TheengsGateway MQTT topic (default `victron/bluetooth`)
+- `THEENGS_TIME_BETWEEN`: Scan/publish interval seconds (default `60`)
+- `THEENGS_LOG_LEVEL`: Log level (default `INFO`)
+- `THEENGS_BT_KEY`: Bluetooth key filter passed to `-bk` (optional)
+- `THEENGS_EXTRA_ARGS`: Extra TheengsGateway arguments (optional)
 
 Example detected VE.Direct path:
 
@@ -76,10 +86,17 @@ Run bridge:
 python src/vedirect_mqtt_bridge.py
 ```
 
+Run TheengsGateway publisher:
+
+```bash
+/usr/local/bin/theengs-gateway.sh
+```
+
 Check MQTT stream:
 
 ```bash
 mosquitto_sub -h 127.0.0.1 -t 'victron/vedirect/#' -v
+mosquitto_sub -h 127.0.0.1 -t 'victron/bluetooth' -v
 ```
 
 ## Install as app service with watchdogs
@@ -98,6 +115,7 @@ What installer does:
 4. Enables Raspberry watchdog boot flag (`dtparam=watchdog=on`)
 5. Enables and starts:
    - `vedirect-mqtt.service`
+  - `theengs-gateway.service`
    - `vedirect-app-watchdog.timer`
    - `watchdog.service`
 
@@ -109,7 +127,7 @@ Reboot is recommended once after installation so hardware watchdog is active fro
 
 - Implemented by `vedirect-app-watchdog.timer` + `vedirect-app-watchdog.service`
 - Runs every 30 seconds
-- If `vedirect-mqtt.service` is not active, it restarts it
+- If either `vedirect-mqtt.service` or `theengs-gateway.service` is not active, it restarts it
 
 ### 2) Raspberry hardware watchdog
 
@@ -142,6 +160,7 @@ In `.env`, set bridge values:
 - `BRIDGE_REMOTE_USERNAME`
 - `BRIDGE_REMOTE_PASSWORD`
 - `BRIDGE_TOPIC` (default `victron/vedirect/#`)
+- `BRIDGE_TOPIC_BLUETOOTH` (default `victron/bluetooth`)
 
 Then run:
 
@@ -161,6 +180,7 @@ This creates `/etc/mosquitto/conf.d/90-victron-bridge.conf` with:
 systemctl status mosquitto
 journalctl -u mosquitto -n 100 --no-pager
 mosquitto_sub -h 127.0.0.1 -t 'victron/vedirect/#' -v
+mosquitto_sub -h 127.0.0.1 -t 'victron/bluetooth' -v
 ```
 
 ## Operations
@@ -169,6 +189,7 @@ Check service health:
 
 ```bash
 systemctl status vedirect-mqtt.service
+systemctl status theengs-gateway.service
 systemctl status vedirect-app-watchdog.timer
 systemctl status watchdog.service
 ```
@@ -183,6 +204,7 @@ Tail app logs:
 
 ```bash
 journalctl -u vedirect-mqtt.service -f
+journalctl -u theengs-gateway.service -f
 ```
 
 Tail app watchdog logs:
@@ -201,6 +223,7 @@ Restart app service:
 
 ```bash
 systemctl restart vedirect-mqtt.service
+systemctl restart theengs-gateway.service
 ```
 
 ## Troubleshooting

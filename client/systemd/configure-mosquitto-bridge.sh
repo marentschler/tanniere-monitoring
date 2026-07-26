@@ -19,6 +19,7 @@ set +a
 : "${BRIDGE_REMOTE_USERNAME:=}"
 : "${BRIDGE_REMOTE_PASSWORD:=}"
 : "${BRIDGE_TOPIC:=victron/vedirect/#}"
+: "${BRIDGE_TOPIC_BLUETOOTH:=victron/bluetooth}"
 
 if [[ -z "$BRIDGE_REMOTE_HOST" ]]; then
   echo "BRIDGE_REMOTE_HOST is empty in .env"
@@ -42,6 +43,16 @@ persistence false
 connection victron-cloud
 address ${BRIDGE_REMOTE_HOST}:${BRIDGE_REMOTE_PORT}
 topic ${BRIDGE_TOPIC} out 1
+
+EOF
+
+if [[ -n "$BRIDGE_TOPIC_BLUETOOTH" ]]; then
+  cat >> "$CONF_FILE" <<EOF
+topic ${BRIDGE_TOPIC_BLUETOOTH} out 1
+EOF
+fi
+
+cat >> "$CONF_FILE" <<EOF
 
 remote_username ${BRIDGE_REMOTE_USERNAME}
 remote_password ${BRIDGE_REMOTE_PASSWORD}

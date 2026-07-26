@@ -1,6 +1,7 @@
 [Unit]
-Description=Watchdog check for VE.Direct MQTT app service
+Description=Watchdog check for VE.Direct and TheengsGateway app services
 After=vedirect-mqtt.service
+After=theengs-gateway.service
 
 [Service]
 Type=oneshot

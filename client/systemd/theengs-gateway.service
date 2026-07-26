@@ -1,0 +1,19 @@
+[Unit]
+Description=TheengsGateway Bluetooth to MQTT bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/tanniere-monitoring-1/client
+EnvironmentFile=/root/tanniere-monitoring-1/client/.env
+ExecStart=/usr/local/bin/theengs-gateway.sh
+Restart=always
+RestartSec=5
+User=root
+
+TimeoutStartSec=30
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

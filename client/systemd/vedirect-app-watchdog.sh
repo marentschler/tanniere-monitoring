@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICE_NAME="vedirect-mqtt.service"
+SERVICES=(
+  "vedirect-mqtt.service"
+  "theengs-gateway.service"
+)
 
-if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-  logger -t vedirect-app-watchdog "$SERVICE_NAME inactive, restarting"
-  systemctl restart "$SERVICE_NAME"
-fi
+for service in "${SERVICES[@]}"; do
+  if ! systemctl is-active --quiet "$service"; then
+    logger -t vedirect-app-watchdog "$service inactive, restarting"
+    systemctl restart "$service"
+  fi
+done

@@ -6,7 +6,9 @@ SYSTEMD_DIR="/etc/systemd/system"
 
 install -m 0755 "$ROOT_DIR/systemd/vedirect-app-watchdog.sh" /usr/local/bin/vedirect-app-watchdog.sh
 install -m 0755 "$ROOT_DIR/systemd/configure-mosquitto-bridge.sh" /usr/local/bin/configure-mosquitto-bridge.sh
+install -m 0755 "$ROOT_DIR/systemd/theengs-gateway.sh" /usr/local/bin/theengs-gateway.sh
 install -m 0644 "$ROOT_DIR/systemd/vedirect-mqtt.service" "$SYSTEMD_DIR/vedirect-mqtt.service"
+install -m 0644 "$ROOT_DIR/systemd/theengs-gateway.service" "$SYSTEMD_DIR/theengs-gateway.service"
 install -m 0644 "$ROOT_DIR/systemd/vedirect-app-watchdog.service" "$SYSTEMD_DIR/vedirect-app-watchdog.service"
 install -m 0644 "$ROOT_DIR/systemd/vedirect-app-watchdog.timer" "$SYSTEMD_DIR/vedirect-app-watchdog.timer"
 
@@ -20,6 +22,7 @@ install -m 0644 "$ROOT_DIR/systemd/watchdog.conf" /etc/watchdog.conf
 
 systemctl daemon-reload
 systemctl enable --now vedirect-mqtt.service
+systemctl enable --now theengs-gateway.service
 systemctl enable --now vedirect-app-watchdog.timer
 systemctl enable --now watchdog.service
 
