@@ -1,0 +1,16 @@
+[Unit]
+Description=Victron VE.Direct to MQTT bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tanniere-monitoring/client
+EnvironmentFile=/opt/tanniere-monitoring/client/.env
+ExecStart=/usr/bin/python3 /opt/tanniere-monitoring/client/src/vedirect_mqtt_bridge.py
+Restart=always
+RestartSec=5
+User=pi
+
+[Install]
+WantedBy=multi-user.target
