@@ -13,12 +13,13 @@
 
 # ─────────────────────────────────────────────────────────── Hetzner Cloud ───
 
-# REQUIRED. API token with Read & Write scope.
+# REQUIRED unless HCLOUD_TOKEN is exported in your shell.
+# API token with Read & Write scope.
 # Create at: https://console.hetzner.cloud -> Project -> Security -> API tokens
 hcloud_token: ""
 
 server_name: tanniere-monitoring
-server_type: cx22
+server_type: cpx22
 server_image: ubuntu-24.04
 server_location: nbg1
 
@@ -55,8 +56,39 @@ mqtt_allowed_ips: 0.0.0.0/0,::/0
 # otherwise Let's Encrypt cannot issue a certificate.
 domain: ""
 
-# REQUIRED. Address Let's Encrypt uses for expiry notices.
+# Optional. If true and domain is empty, 01-create-server.sh auto-generates
+# <server-ip>.sslip.io and writes it back into config.yaml.
+auto_domain: false
+
+# Domain suffix used with auto_domain. sslip.io is a wildcard DNS that resolves
+# the embedded IPv4 automatically.
+auto_domain_suffix: sslip.io
+
+# Optional. Address Let's Encrypt uses for expiry notices.
+# If empty, provisioning defaults to admin@<domain>.
 acme_email: ""
+
+# Optional. Dynamic DNS update URL called after server creation.
+# Placeholders:
+#   {ip}      -> server public IPv4
+#   {domain}  -> value of domain
+# Example:
+# dyndns_update_url: "https://www.duckdns.org/update?domains=myhost&token=TOKEN&ip={ip}"
+dyndns_update_url: ""
+
+# Optional. Native Google Cloud DNS update mode.
+# If enabled, 01-create-server.sh updates one A record to the server IP.
+google_dns_enabled: false
+google_dns_project: "monitor.tanniere.net"
+google_dns_zone: ""
+# Leave empty to use 'domain'.
+google_dns_record: ""
+google_dns_ttl: 60
+
+# Optional OAuth access token used for Google Cloud DNS updates.
+# If empty, the script tries GOOGLE_DNS_TOKEN env var, then
+# `gcloud auth print-access-token`.
+google_dns_token: ""
 
 timezone: Europe/Berlin
 

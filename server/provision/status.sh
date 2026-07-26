@@ -10,7 +10,7 @@ require_server_ip
 BUCKET="$INFLUXDB_BUCKET"
 
 log "Server: $SERVER_NAME ($SERVER_IP)"
-hcloud server describe "$SERVER_NAME" -o 'format={{.Status}}  {{.ServerType.Name}}  {{.Datacenter.Name}}'
+hcloud server describe "$SERVER_NAME" -o 'format={{.Status}}  {{.ServerType.Name}}  {{.Location.Name}}'
 
 echo
 log "Containers"

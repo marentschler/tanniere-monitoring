@@ -10,11 +10,22 @@ if [ ! -f "$CONFIG_FILE" ]; then
 	chmod 600 "$CONFIG_FILE" 2>/dev/null || true
 	cat <<EOF
 
-Created server/config.yaml. Fill in these three values, then run this script again:
+Created server/config.yaml. Fill in these required values, then run this script again:
 
   hcloud_token   Hetzner API token with Read & Write scope
-  domain         the hostname Grafana and MQTT will use
-  acme_email     where Let's Encrypt sends expiry notices
+                 (or export HCLOUD_TOKEN in your shell)
+
+And choose one domain mode:
+
+  domain         set your own hostname and DNS A record manually
+  OR
+  auto_domain    set to true to use <server-ip>.sslip.io automatically
+
+Optional:
+
+  acme_email         contact email for Let's Encrypt (defaults to admin@<domain>)
+  dyndns_update_url  provider update URL with {ip} and optionally {domain}
+  google_dns_*       enable native Google Cloud DNS updates (project/zone/record)
 
 Everything else has a working default, and the passwords generate themselves.
 EOF
@@ -29,6 +40,7 @@ ensure_secrets
 render_env
 ok "Rendered $ENV_FILE from config.yaml"
 
+if [ -n "$DOMAIN" ]; then
 cat <<EOF
 
 Credentials
@@ -55,3 +67,15 @@ Back it up somewhere safe.
 
 Next: ./provision/01-create-server.sh
 EOF
+else
+cat <<EOF
+
+Credentials (domain pending)
+  auto_domain is enabled, so DOMAIN will be generated after the server is created.
+  Expected format: <server-ip>.${AUTO_DOMAIN_SUFFIX}
+
+MQTT and Grafana credentials are ready and saved in config.yaml.
+
+Next: ./provision/01-create-server.sh
+EOF
+fi

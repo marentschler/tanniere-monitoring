@@ -22,7 +22,8 @@ if hcloud ssh-key describe "$SSH_KEY_NAME" >/dev/null 2>&1; then
 	ok "SSH key '$SSH_KEY_NAME' already registered in the Hetzner project"
 else
 	log "Uploading SSH key '$SSH_KEY_NAME'"
-	hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key-from-file "$PUBKEY_PATH"
+  PUBKEY_CONTENT="$(tr -d '\r\n' <"$PUBKEY_PATH")"
+  hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key "$PUBKEY_CONTENT"
 	ok "SSH key uploaded"
 fi
 
@@ -122,8 +123,74 @@ require_server_ip
 wait_for_ssh
 wait_for_cloud_init
 
+DOMAIN_WAS_EMPTY=0
+if [ -z "$DOMAIN" ] && is_true "$AUTO_DOMAIN"; then
+  DOMAIN_WAS_EMPTY=1
+  AUTO_SUFFIX="${AUTO_DOMAIN_SUFFIX#.}"
+  AUTO_SUFFIX="${AUTO_SUFFIX%.}"
+  [ -n "$AUTO_SUFFIX" ] || die "auto_domain_suffix is empty in $CONFIG_FILE"
+  DOMAIN="${SERVER_IP}.${AUTO_SUFFIX}"
+  cfg_set domain "$DOMAIN"
+  ok "Auto-generated domain '$DOMAIN' and saved it to config.yaml"
+fi
+
+if is_true "$GOOGLE_DNS_ENABLED"; then
+  RECORD_NAME="$GOOGLE_DNS_RECORD"
+  [ -n "$RECORD_NAME" ] || RECORD_NAME="$DOMAIN"
+  log "Updating Google Cloud DNS record '$RECORD_NAME'"
+  GOOGLE_TOKEN_ARGS=()
+  if [ -n "$GOOGLE_DNS_TOKEN" ]; then
+    GOOGLE_TOKEN_ARGS=(--token "$GOOGLE_DNS_TOKEN")
+  fi
+  bash "$PROVISION_DIR/google-dns-update.sh" \
+    --project "$GOOGLE_DNS_PROJECT" \
+    --zone "$GOOGLE_DNS_ZONE" \
+    --record "$RECORD_NAME" \
+    --ip "$SERVER_IP" \
+    --ttl "$GOOGLE_DNS_TTL" \
+    ${GOOGLE_TOKEN_ARGS[@]+"${GOOGLE_TOKEN_ARGS[@]}"}
+  if [ "$RECORD_NAME" != "$GOOGLE_DNS_RECORD" ]; then
+    cfg_set google_dns_record "$RECORD_NAME"
+  fi
+  ok "Google Cloud DNS record updated"
+fi
+
+if [ -n "$DYNDNS_UPDATE_URL" ]; then
+  require_cmd curl
+  UPDATE_URL="${DYNDNS_UPDATE_URL//\{ip\}/$SERVER_IP}"
+  UPDATE_URL="${UPDATE_URL//\{domain\}/$DOMAIN}"
+  log "Updating DDNS record via configured update URL"
+  if curl -fsS --max-time 20 "$UPDATE_URL" >/dev/null; then
+    ok "DDNS update request succeeded"
+  else
+    warn "DDNS update request failed. Check dyndns_update_url in config.yaml."
+  fi
+fi
+
+if [ -z "$ACME_EMAIL" ] && [ -n "$DOMAIN" ]; then
+  ACME_EMAIL="admin@${DOMAIN}"
+  cfg_set acme_email "$ACME_EMAIL"
+  ok "acme_email was empty; defaulted to '$ACME_EMAIL'"
+fi
+
+render_env
+
 echo
 ok "Server '$SERVER_NAME' is ready at ${SERVER_IP}"
+if [ "$DOMAIN_WAS_EMPTY" -eq 1 ]; then
+cat <<EOF
+
+Next steps
+  1. Deploy the stack (no manual DNS step needed):
+
+       ./provision/02-deploy-stack.sh
+
+  Auto-generated domain:
+       ${DOMAIN}
+
+  Shell access: ./provision/ssh.sh
+EOF
+else
 cat <<EOF
 
 Next steps
@@ -139,3 +206,4 @@ Next steps
 
   Shell access: ./provision/ssh.sh
 EOF
+fi

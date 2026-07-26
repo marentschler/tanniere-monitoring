@@ -17,7 +17,7 @@ lives in a single file: [config.example.yaml](config.example.yaml).
   (`winget install Hetzner.hcloud`, or `brew install hcloud`)
 - A Hetzner Cloud API token with **Read & Write** scope
 - An SSH keypair (`ssh-keygen -t ed25519` if you don't have one)
-- A domain you control, so Let's Encrypt can issue a certificate
+- Either a domain you control, or `auto_domain: true` in `config.yaml`
 - Bash. On Windows, run these from Git Bash.
 
 > This repo was set up on Windows, where git does not track the executable bit
@@ -28,11 +28,55 @@ lives in a single file: [config.example.yaml](config.example.yaml).
 
 Run everything from this `server/` directory.
 
+### One-command setup (DDNS host)
+
+If you already have a DDNS hostname (for example DuckDNS, No-IP, Dynu), you can
+run the whole flow in one command:
+
+```bash
+HCLOUD_TOKEN=<your-token> \
+./provision/10-auto-setup.sh --dyndns-host <your-ddns-host>
+```
+
+This supports "auth outside the CLI": export `HCLOUD_TOKEN` (and optionally
+`GOOGLE_DNS_TOKEN`) in your shell, and no interactive login is needed.
+
+Optional overrides:
+
+```bash
+./provision/10-auto-setup.sh \
+  --dyndns-host <your-ddns-host> \
+  --mqtt-username victron \
+  --mqtt-password '<choose-password>' \
+  --grafana-username admin \
+  --grafana-password '<choose-password>'
+```
+
+Google Cloud DNS mode (auto-update A record after server IP is known):
+
+```bash
+HCLOUD_TOKEN=<your-token> GOOGLE_DNS_TOKEN=<oauth-token> \
+./provision/10-auto-setup.sh \
+  --dyndns-host monitor.example.com \
+  --google-dns-project <gcp-project-id> \
+  --google-dns-zone <managed-zone-name>
+```
+
+If `GOOGLE_DNS_TOKEN` is omitted, the script tries
+`gcloud auth print-access-token`.
+
+If your DDNS provider supports an HTTP update URL, add `dyndns_update_url` in
+`config.yaml` (with `{ip}` and optional `{domain}` placeholders). The script
+invokes it automatically after server creation.
+
+### Step-by-step setup
+
 ```bash
 # 1. Creates config.yaml from the template.
 ./provision/00-init.sh
 
-# 2. Fill in the three REQUIRED values: hcloud_token, domain, acme_email.
+# 2. Fill in the required values: hcloud_token, acme_email,
+#    and either domain OR auto_domain: true.
 ${EDITOR:-notepad} config.yaml
 
 # 3. Validates the config, generates the passwords, prints the credentials.
@@ -41,15 +85,19 @@ ${EDITOR:-notepad} config.yaml
 # 4. Create the server, firewall, and harden the OS. Prints the public IP.
 ./provision/01-create-server.sh
 
-# 5. Point DNS at that IP:  <your-domain>.  A  <server-ip>
-#    Once it resolves, deploy.
+# 5. If you set domain manually: point DNS at that IP.
+#    If auto_domain: true, this step is skipped.
 ./provision/02-deploy-stack.sh
 ```
 
-Step 5 is the one thing that cannot be scripted — ACME validation only succeeds
-once the A record resolves to the server. `02-deploy-stack.sh` warns and
-continues if DNS isn't ready; Caddy keeps retrying, and once it has the
-certificate the `mqtt-cert-sync` timer hands it to Mosquitto.
+When `auto_domain: true` and `domain` is empty, `01-create-server.sh`
+auto-generates `<server-ip>.sslip.io`, writes it into `config.yaml`, and no
+manual DNS A record is needed.
+
+If you set your own domain, ACME validation only succeeds once its A record
+resolves to the server. `02-deploy-stack.sh` warns and continues if DNS isn't
+ready; Caddy keeps retrying, and once it has the certificate the
+`mqtt-cert-sync` timer hands it to Mosquitto.
 
 ## Configuration
 

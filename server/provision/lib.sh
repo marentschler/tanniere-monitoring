@@ -78,7 +78,13 @@ load_config() {
      then fill in hcloud_token, domain and acme_email."
 	fi
 
+	EXTERNAL_HCLOUD_TOKEN="${HCLOUD_TOKEN:-}"
+	EXTERNAL_GOOGLE_DNS_TOKEN="${GOOGLE_DNS_TOKEN:-}"
+
 	HCLOUD_TOKEN="$(cfg hcloud_token)"
+	if [ -z "$HCLOUD_TOKEN" ] && [ -n "$EXTERNAL_HCLOUD_TOKEN" ]; then
+		HCLOUD_TOKEN="$EXTERNAL_HCLOUD_TOKEN"
+	fi
 	SERVER_NAME="$(cfg server_name)";         : "${SERVER_NAME:=tanniere-monitoring}"
 	SERVER_TYPE="$(cfg server_type)";         : "${SERVER_TYPE:=cx22}"
 	SERVER_IMAGE="$(cfg server_image)";       : "${SERVER_IMAGE:=ubuntu-24.04}"
@@ -94,7 +100,23 @@ load_config() {
 	MQTT_ALLOWED_IPS="$(cfg mqtt_allowed_ips)"; : "${MQTT_ALLOWED_IPS:=0.0.0.0/0,::/0}"
 
 	DOMAIN="$(cfg domain)"
+	AUTO_DOMAIN="$(cfg auto_domain)"; : "${AUTO_DOMAIN:=false}"
+	AUTO_DOMAIN_SUFFIX="$(cfg auto_domain_suffix)"; : "${AUTO_DOMAIN_SUFFIX:=sslip.io}"
+	DYNDNS_UPDATE_URL="$(cfg dyndns_update_url)"
+	GOOGLE_DNS_ENABLED="$(cfg google_dns_enabled)"; : "${GOOGLE_DNS_ENABLED:=false}"
+	GOOGLE_DNS_PROJECT="$(cfg google_dns_project)"
+	GOOGLE_DNS_ZONE="$(cfg google_dns_zone)"
+	GOOGLE_DNS_RECORD="$(cfg google_dns_record)"
+	GOOGLE_DNS_TTL="$(cfg google_dns_ttl)"; : "${GOOGLE_DNS_TTL:=60}"
+	GOOGLE_DNS_TOKEN="$(cfg google_dns_token)"
+	if [ -z "$GOOGLE_DNS_TOKEN" ] && [ -n "$EXTERNAL_GOOGLE_DNS_TOKEN" ]; then
+		GOOGLE_DNS_TOKEN="$EXTERNAL_GOOGLE_DNS_TOKEN"
+	fi
 	ACME_EMAIL="$(cfg acme_email)"
+	if [ -z "$ACME_EMAIL" ] && [ -n "$DOMAIN" ]; then
+		# LetsEncrypt email is optional; default to a predictable contact when omitted.
+		ACME_EMAIL="admin@${DOMAIN}"
+	fi
 	TIMEZONE="$(cfg timezone)";               : "${TIMEZONE:=UTC}"
 
 	MQTT_USERNAME="$(cfg mqtt_username)";     : "${MQTT_USERNAME:=victron}"
@@ -118,22 +140,45 @@ load_config() {
 
 # Fail early on the values only a human can supply.
 validate_config() {
-	[ -n "$HCLOUD_TOKEN" ] || die "hcloud_token is empty in $CONFIG_FILE."
-	[ -n "$DOMAIN" ] || die "domain is empty in $CONFIG_FILE. Let's Encrypt cannot issue a certificate without one."
-	[ -n "$ACME_EMAIL" ] || die "acme_email is empty in $CONFIG_FILE."
+	[ -n "$HCLOUD_TOKEN" ] || die "No Hetzner token configured. Set hcloud_token in $CONFIG_FILE or export HCLOUD_TOKEN in your shell."
 
-	case "$DOMAIN" in
-		*example.com | *example.org | \<*)
-			die "domain is still the placeholder '$DOMAIN'. Use a hostname you control." ;;
-	esac
-	case "$DOMAIN" in
-		*.*) ;;
-		*) die "domain '$DOMAIN' is not a fully qualified hostname." ;;
-	esac
-	case "$ACME_EMAIL" in
-		*@*.*) ;;
-		*) die "acme_email '$ACME_EMAIL' does not look like an email address." ;;
-	esac
+	if [ -z "$DOMAIN" ] && ! is_true "$AUTO_DOMAIN"; then
+		die "domain is empty in $CONFIG_FILE. Set domain, or set auto_domain: true to use <server-ip>.sslip.io automatically."
+	fi
+	if is_true "$GOOGLE_DNS_ENABLED" && [ -z "$DOMAIN" ]; then
+		die "google_dns_enabled is true but domain is empty. Set domain to your DDNS host."
+	fi
+	if is_true "$GOOGLE_DNS_ENABLED" && is_true "$AUTO_DOMAIN"; then
+		die "google_dns_enabled and auto_domain cannot both be true. Google DNS mode expects an explicit domain."
+	fi
+
+	if [ -n "$DOMAIN" ]; then
+		case "$DOMAIN" in
+			*example.com | *example.org | \<*)
+				die "domain is still the placeholder '$DOMAIN'. Use a hostname you control." ;;
+		esac
+		case "$DOMAIN" in
+			*.*) ;;
+			*) die "domain '$DOMAIN' is not a fully qualified hostname." ;;
+		esac
+	fi
+	if [ -n "$ACME_EMAIL" ]; then
+		case "$ACME_EMAIL" in
+			*@*.*) ;;
+			*) die "acme_email '$ACME_EMAIL' does not look like an email address." ;;
+		esac
+	fi
+
+	if is_true "$GOOGLE_DNS_ENABLED"; then
+		[ -n "$GOOGLE_DNS_PROJECT" ] || die "google_dns_project is required when google_dns_enabled is true."
+		[ -n "$GOOGLE_DNS_ZONE" ] || die "google_dns_zone is required when google_dns_enabled is true."
+		if [ -z "$GOOGLE_DNS_RECORD" ]; then
+			GOOGLE_DNS_RECORD="$DOMAIN"
+		fi
+		case "$GOOGLE_DNS_TTL" in
+			''|*[!0-9]*) die "google_dns_ttl must be an integer number of seconds." ;;
+		esac
+	fi
 }
 
 gen_secret() {
