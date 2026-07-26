@@ -5,12 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/tanniere-monitoring/client
-EnvironmentFile=/opt/tanniere-monitoring/client/.env
-ExecStart=/usr/bin/python3 /opt/tanniere-monitoring/client/src/vedirect_mqtt_bridge.py
+WorkingDirectory=/root/tanniere-monitoring-1/client
+EnvironmentFile=/root/tanniere-monitoring-1/client/.env
+ExecStart=/root/tanniere-monitoring-1/client/.venv/bin/python /root/tanniere-monitoring-1/client/src/vedirect_mqtt_bridge.py
 Restart=always
 RestartSec=5
-User=pi
+User=root
+
+# If the process hangs and stops heartbeating logs/IO, systemd can still restart it.
+TimeoutStartSec=30
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target

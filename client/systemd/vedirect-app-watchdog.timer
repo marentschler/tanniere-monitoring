@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic watchdog for VE.Direct MQTT app service
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+Unit=vedirect-app-watchdog.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

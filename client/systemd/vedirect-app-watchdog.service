@@ -1,0 +1,7 @@
+[Unit]
+Description=Watchdog check for VE.Direct MQTT app service
+After=vedirect-mqtt.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vedirect-app-watchdog.sh
