@@ -1,12 +1,42 @@
+name: tanniere-monitoring
+
 services:
+  # TLS termination for Grafana. Also the ACME client for the whole host --
+  # Mosquitto reuses the certificate Caddy obtains here.
+  caddy:
+    image: caddy:2.8
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - grafana
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Bind-mounted rather than a named volume so scripts/sync-mqtt-certs.sh
+      # can read the issued certificate from the host.
+      - ./data/caddy-data:/data
+      - ./data/caddy-config:/config
+    networks:
+      - monitoring
+
   mosquitto:
     image: eclipse-mosquitto:2.0
     container_name: mosquitto
     restart: unless-stopped
     ports:
-      - "1883:1883"
+      # Only the TLS listener is published. The plaintext 1883 listener stays on
+      # the internal network for Telegraf.
+      - "8883:8883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     networks:
@@ -17,7 +47,8 @@ services:
     container_name: influxdb
     restart: unless-stopped
     ports:
-      - "8086:8086"
+      # Loopback only -- reach the UI through provision/tunnel.sh.
+      - "127.0.0.1:8086:8086"
     environment:
       - TZ=${TZ}
       - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -30,6 +61,12 @@ services:
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - monitoring
 
@@ -38,9 +75,14 @@ services:
     container_name: telegraf
     restart: unless-stopped
     depends_on:
-      - mosquitto
-      - influxdb
+      influxdb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
     environment:
+      - MQTT_URL=tcp://mosquitto:1883
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN}
       - INFLUXDB_ORG=${INFLUXDB_INIT_ORG}
@@ -55,13 +97,20 @@ services:
     container_name: grafana
     restart: unless-stopped
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      # Loopback only -- public access goes through Caddy on 443.
+      - "127.0.0.1:3000:3000"
     environment:
       - TZ=${TZ}
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=https://${DOMAIN}
+      - GF_SERVER_DOMAIN=${DOMAIN}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_ORG=${INFLUXDB_INIT_ORG}
       - INFLUXDB_BUCKET=${INFLUXDB_INIT_BUCKET}

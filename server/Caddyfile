@@ -1,0 +1,29 @@
+# Caddy terminates TLS for Grafana and, as a side effect, manages the
+# certificate that Mosquitto reuses for MQTT over TLS on 8883
+# (see scripts/sync-mqtt-certs.sh).
+
+{
+	email {$ACME_EMAIL}
+	# Uncomment to test against the staging CA and avoid rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Grafana's live/websocket endpoints work through this as-is.
+	reverse_proxy grafana:3000
+
+	log {
+		output stdout
+		format console
+	}
+}

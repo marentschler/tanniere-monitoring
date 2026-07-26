@@ -1,0 +1,83 @@
+# tanniere-monitoring: the single configuration file for the whole server side.
+#
+#   cp config.example.yaml config.yaml
+#   then fill in the four values marked REQUIRED and run ./provision/00-init.sh
+#
+# Everything left empty under "secrets" is generated for you on first run and
+# written back into this file. Keep config.yaml out of version control -- it is
+# already listed in .gitignore.
+#
+# Format note: this is read by a small shell parser, so keep it flat
+# (`key: value`, one per line) and put comments on their own lines.
+
+
+# ─────────────────────────────────────────────────────────── Hetzner Cloud ───
+
+# REQUIRED. API token with Read & Write scope.
+# Create at: https://console.hetzner.cloud -> Project -> Security -> API tokens
+hcloud_token: ""
+
+server_name: tanniere-monitoring
+server_type: cx22
+server_image: ubuntu-24.04
+server_location: nbg1
+
+# Hetzner's automatic daily backups (+20% of the server price).
+enable_backups: false
+
+
+# ─────────────────────────────────────────────────────────────────── Access ───
+
+# Local SSH keypair used to reach the server. The matching .pub file is uploaded
+# to Hetzner and injected into the deploy user.
+ssh_key_path: ~/.ssh/id_ed25519
+
+# Name the public key is registered under in the Hetzner project.
+# Leave empty to use "<server_name>-key".
+ssh_key_name: ""
+
+# Unprivileged user created on the server; all deploys run as it.
+deploy_user: deploy
+
+# Where the stack lives on the server.
+remote_dir: /opt/tanniere-monitoring
+
+# Cloud firewall sources, comma separated CIDRs.
+# Narrow these to your own addresses if they are static, e.g. 203.0.113.10/32
+ssh_allowed_ips: 0.0.0.0/0,::/0
+mqtt_allowed_ips: 0.0.0.0/0,::/0
+
+
+# ────────────────────────────────────────────────────────────── Application ───
+
+# REQUIRED. Public hostname for Grafana (HTTPS) and MQTT over TLS.
+# A DNS A record for this name must point at the server before you deploy,
+# otherwise Let's Encrypt cannot issue a certificate.
+domain: ""
+
+# REQUIRED. Address Let's Encrypt uses for expiry notices.
+acme_email: ""
+
+timezone: Europe/Berlin
+
+influxdb_org: tanniere
+influxdb_bucket: victron
+
+# 0 means keep measurements forever. Otherwise a duration such as 365d.
+influxdb_retention: 0
+
+
+# ────────────────────────────────────────────────────────────────── Secrets ───
+
+# Leave the passwords and tokens empty to have strong ones generated and saved
+# back here on the first run. Set them yourself only if you have a reason to.
+
+mqtt_username: victron
+mqtt_password: ""
+
+influxdb_username: admin
+influxdb_password: ""
+influxdb_admin_token: ""
+
+grafana_username: admin
+grafana_password: ""

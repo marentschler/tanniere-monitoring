@@ -7,3 +7,11 @@ __pycache__/
 
 server/influxdb-data/
 server/grafana-data/
+
+# The single config file: holds the Hetzner API token and every secret
+server/config.yaml
+
+# Runtime state on the server side
+server/data/
+server/mosquitto/certs/
+server/mosquitto/passwd

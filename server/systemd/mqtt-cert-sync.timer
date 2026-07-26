@@ -1,0 +1,12 @@
+[Unit]
+Description=Twice-daily check for a renewed TLS certificate for Mosquitto
+
+[Timer]
+# Caddy renews ~30 days before expiry, so two checks a day is ample headroom.
+OnCalendar=*-*-* 03,15:20:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=mqtt-cert-sync.service
+
+[Install]
+WantedBy=timers.target

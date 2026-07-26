@@ -1,0 +1,114 @@
+#cloud-config
+# First-boot bootstrap for the tanniere-monitoring server.
+# __PLACEHOLDER__ tokens are substituted by provision/01-create-server.sh.
+
+hostname: __HOSTNAME__
+preserve_hostname: false
+timezone: __TIMEZONE__
+
+# No password logins, no root over SSH. The deploy user owns the stack.
+disable_root: true
+ssh_pwauth: false
+
+users:
+  - name: __DEPLOY_USER__
+    # The docker group does not exist yet at this point -- runcmd adds it below.
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - jq
+
+write_files:
+  # Cap container log growth so a chatty service cannot fill the disk.
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "live-restore": true
+      }
+
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      X11Forwarding no
+      MaxAuthTries 3
+      AllowTcpForwarding yes
+
+  - path: /etc/fail2ban/jail.local
+    permissions: "0644"
+    content: |
+      [DEFAULT]
+      backend = systemd
+      bantime = 1h
+      findtime = 10m
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+runcmd:
+  # 2G swap: InfluxDB compaction spikes are the main memory risk on a 4G box.
+  - |
+    if [ ! -f /swapfile ]; then
+      fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      sysctl -w vm.swappiness=10
+      echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+    fi
+
+  # Host firewall. Note: this does NOT filter Docker-published ports (Docker's
+  # DNAT rules bypass the ufw INPUT chain) -- the Hetzner cloud firewall is the
+  # real gate for 80/443/8883. ufw guards host-level services such as SSH.
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment SSH
+  - ufw allow 80/tcp comment HTTP-ACME
+  - ufw allow 443/tcp comment HTTPS
+  - ufw allow 443/udp comment HTTP3
+  - ufw allow 8883/tcp comment MQTTS
+  - ufw --force enable
+
+  # Docker CE with the compose v2 plugin, straight from Docker's installer.
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - rm -f /tmp/get-docker.sh
+  - systemctl enable --now docker
+  - usermod -aG docker __DEPLOY_USER__
+
+  - install -d -o __DEPLOY_USER__ -g __DEPLOY_USER__ -m 0755 __REMOTE_DIR__
+
+  - systemctl enable --now fail2ban
+  - systemctl restart ssh || systemctl restart sshd || true
+
+final_message: "tanniere-monitoring host ready after $UPTIME seconds"

@@ -1,0 +1,13 @@
+[Unit]
+Description=Copy the Caddy-managed TLS certificate to Mosquitto
+Documentation=file://__REMOTE_DIR__/scripts/sync-mqtt-certs.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__REMOTE_DIR__
+Environment=REMOTE_DIR=__REMOTE_DIR__
+ExecStart=/usr/bin/env bash __REMOTE_DIR__/scripts/sync-mqtt-certs.sh
+# Exit code 1 just means "certificate not issued yet" -- not a failure worth alerting on.
+SuccessExitStatus=0 1
