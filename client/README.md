@@ -34,6 +34,9 @@ Data flow:
 
 ## Configuration
 
+All manual inputs are centralized in one file: `.env`.
+Do not edit service scripts or unit files for normal configuration changes.
+
 Create your runtime config:
 
 ```bash
@@ -114,6 +117,52 @@ Reboot is recommended once after installation so hardware watchdog is active fro
 - Kernel boot flag enabled via `/boot/firmware/config.txt`
 - If userspace hangs and watchdog is not fed, board is reset by hardware watchdog
 
+## Read-only filesystem mode (best effort)
+
+If your root filesystem is read-only, you cannot keep durable local queues across reboot.
+
+Recommended best-effort pattern:
+
+1. App publishes only to local Mosquitto (`MQTT_HOST=127.0.0.1`)
+2. Local Mosquitto bridges to cloud broker over TLS
+3. During WAN outages, local Mosquitto keeps a RAM queue
+4. When WAN returns, broker forwards backlog
+
+Limits in this mode:
+
+- Data queued in RAM is lost on reboot/power loss.
+- This protects against network outages, not power cycles.
+
+### Configure volatile local Mosquitto bridge
+
+In `.env`, set bridge values:
+
+- `BRIDGE_REMOTE_HOST`
+- `BRIDGE_REMOTE_PORT` (usually `8883`)
+- `BRIDGE_REMOTE_USERNAME`
+- `BRIDGE_REMOTE_PASSWORD`
+- `BRIDGE_TOPIC` (default `victron/vedirect/#`)
+
+Then run:
+
+```bash
+sudo /usr/local/bin/configure-mosquitto-bridge.sh
+```
+
+This creates `/etc/mosquitto/conf.d/90-victron-bridge.conf` with:
+
+- `persistence false`
+- TLS bridge to remote broker
+- RAM queue (`max_queued_messages 5000`)
+
+### Verify bridge
+
+```bash
+systemctl status mosquitto
+journalctl -u mosquitto -n 100 --no-pager
+mosquitto_sub -h 127.0.0.1 -t 'victron/vedirect/#' -v
+```
+
 ## Operations
 
 Check service health:
@@ -171,6 +220,12 @@ dmesg | grep -Ei 'tty(USB|ACM)|victron|ftdi|cp210|ch34'
 - Verify broker host/port in `.env`
 - Verify broker is listening
 - If local broker is used: `systemctl status mosquitto`
+
+### WAN is down
+
+- Client still publishes to local Mosquitto.
+- Local Mosquitto queues in RAM until WAN returns.
+- Queue is lost if the device reboots while WAN is still down.
 
 ### Service not starting
 

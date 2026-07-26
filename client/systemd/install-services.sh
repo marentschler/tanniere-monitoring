@@ -5,6 +5,7 @@ ROOT_DIR="/root/tanniere-monitoring-1/client"
 SYSTEMD_DIR="/etc/systemd/system"
 
 install -m 0755 "$ROOT_DIR/systemd/vedirect-app-watchdog.sh" /usr/local/bin/vedirect-app-watchdog.sh
+install -m 0755 "$ROOT_DIR/systemd/configure-mosquitto-bridge.sh" /usr/local/bin/configure-mosquitto-bridge.sh
 install -m 0644 "$ROOT_DIR/systemd/vedirect-mqtt.service" "$SYSTEMD_DIR/vedirect-mqtt.service"
 install -m 0644 "$ROOT_DIR/systemd/vedirect-app-watchdog.service" "$SYSTEMD_DIR/vedirect-app-watchdog.service"
 install -m 0644 "$ROOT_DIR/systemd/vedirect-app-watchdog.timer" "$SYSTEMD_DIR/vedirect-app-watchdog.timer"
